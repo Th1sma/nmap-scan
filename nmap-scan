@@ -44,7 +44,7 @@ def run_nmap(target, mode):
     
     print(f"[*] Mode : {mode.upper()}")
     print(f"[*] Cible : {target}")
-    print(f"[*] Lancement de Nmap... (cela peut prendre du temps)\n")
+    print(f"[*] Lancement de Nmap...\n")
     
     try:
         # Shell=True pour la simplicité de la commande

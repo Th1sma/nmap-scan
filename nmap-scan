@@ -56,45 +56,58 @@ def run_nmap(target, mode):
 
 # Construction du rapport Markdown à partir du XML
 def build_report(xml_path, target, mode):
-    """Analyse le XML et génère un fichier Markdown propre."""
+    """Analyse le XML et génère un rapport incluant TOUS les ports sans distinction d'état."""
     md_path = xml_path.replace(".xml", ".md")
     
     try:
         tree = ET.parse(xml_path)
         root = tree.getroot()
         
-        detected_os = "Non détecté"
+        # Extraction de l'OS global (si détecté)
+        detected_os = "Non identifié"
         os_match = root.find(".//osmatch")
         if os_match is not None:
             detected_os = os_match.get('name')
+        else:
+            service_info = root.find(".//service")
+            if service_info is not None and service_info.get('ostype'):
+                detected_os = service_info.get('ostype')
 
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(f"# Rapport de Scan : {target}\n\n")
             f.write(f"- **Date** : {datetime.now().strftime('%d/%m/%Y %H:%M')}\n")
             f.write(f"- **Profil** : {mode.upper()}\n")
-            f.write(f"- **Détails** : {SCAN_PROFILES[mode]['desc']}\n\n")
             f.write(f"- **OS détecté** : `{detected_os}`\n\n")
-            f.write("## Résultats des Ports Ouverts\n\n")
-            f.write("| Port | Protocole | État | Service | Version | OS |\n")
+            
+            f.write("## 📝 Résultats de l'analyse des ports\n\n")
+            f.write("| Port | Protocole | État | Service | Version | Info OS |\n")
             f.write("| :--- | :--- | :--- | :--- | :--- | :--- |\n")
             
+            # On boucle sur TOUS les ports listés dans le XML
             for port in root.findall(".//port"):
+                port_id = port.get('portid')
+                proto = port.get('protocol')
+                
+                # Récupération de l'état (open, closed, etc.)
                 state_node = port.find('state')
-                if state_node is not None and state_node.get('state') == "open":
-                    port_id = port.get('portid')
-                    proto = port.get('protocol')
-                    state = state_node.get('state')
-                    
-                    service_tag = port.find('service')
-                    service = service_tag.get('name', 'N/A') if service_tag is not None else "N/A"
-                    product = service_tag.get('product', '') if service_tag is not None else ""
-                    version = service_tag.get('version', '') if service_tag is not None else ""
-                    
-                    # On concatène Produit + Version pour la colonne Version
+                state = state_node.get('state') if state_node is not None else "unknown"
+                
+                # Récupération des informations de service
+                service_tag = port.find('service')
+                service = "N/A"
+                full_version = "N/A"
+                port_os = detected_os
+                
+                if service_tag is not None:
+                    service = service_tag.get('name', 'N/A')
+                    product = service_tag.get('product', '')
+                    version = service_tag.get('version', '')
                     full_version = f"{product} {version}".strip() or "N/A"
-                    
-                    # On écrit la ligne avec l'OS détecté à la fin
-                    f.write(f"| {port_id} | {proto} | {state} | {service} | {full_version} | {detected_os} |\n")
+                    if service_tag.get('ostype'):
+                        port_os = service_tag.get('ostype')
+
+                # Écriture de la ligne dans le tableau
+                f.write(f"| {port_id} | {proto} | {state} | {service} | {full_version} | {port_os} |\n")
         
         return md_path
     except Exception as e:

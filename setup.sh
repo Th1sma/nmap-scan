@@ -5,6 +5,6 @@ sudo apt update && sudo apt install -y nmap pandoc
 
 mkdir -p reports
 
-chmod +x nmap-scan
+chmod +x nmap-scan.py
 
 echo "✅ Installation terminée ! Utilise './nmap-scan --help' pour commencer et voir les commandes disponibles."

@@ -19,7 +19,7 @@ chmod +x setup.sh
 
 ## Utilisation 
 ```
-sudo ./nmap-scan -m <MODE> <IP_CIBLE> 
+./nmap-scan -m <MODE> <IP_CIBLE> 
 ```
 
 ### Modes disponibles : 

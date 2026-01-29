@@ -56,34 +56,45 @@ def run_nmap(target, mode):
 
 # Construction du rapport Markdown à partir du XML
 def build_report(xml_path, target, mode):
-    """Analyse le XML et génère un fichier Markdown."""
+    """Analyse le XML et génère un fichier Markdown propre."""
     md_path = xml_path.replace(".xml", ".md")
     
     try:
         tree = ET.parse(xml_path)
         root = tree.getroot()
         
+        detected_os = "Non détecté"
+        os_match = root.find(".//osmatch")
+        if os_match is not None:
+            detected_os = os_match.get('name')
+
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(f"# Rapport de Scan : {target}\n\n")
             f.write(f"- **Date** : {datetime.now().strftime('%d/%m/%Y %H:%M')}\n")
             f.write(f"- **Profil** : {mode.upper()}\n")
             f.write(f"- **Détails** : {SCAN_PROFILES[mode]['desc']}\n\n")
-            
-            f.write("## 📝 Résultats des Ports Ouverts\n\n")
+            f.write(f"- **OS détecté** : `{detected_os}`\n\n")
+            f.write("## Résultats des Ports Ouverts\n\n")
             f.write("| Port | Protocole | État | Service | Version | OS |\n")
-            f.write("| :--- | :--- | :--- | :--- | :--- |\n")
+            f.write("| :--- | :--- | :--- | :--- | :--- | :--- |\n")
             
             for port in root.findall(".//port"):
-                state = port.find('state').get('state')
-                if state == "open":
+                state_node = port.find('state')
+                if state_node is not None and state_node.get('state') == "open":
                     port_id = port.get('portid')
                     proto = port.get('protocol')
+                    state = state_node.get('state')
+                    
                     service_tag = port.find('service')
                     service = service_tag.get('name', 'N/A') if service_tag is not None else "N/A"
                     product = service_tag.get('product', '') if service_tag is not None else ""
                     version = service_tag.get('version', '') if service_tag is not None else ""
                     
-                    f.write(f"| {port_id} | {proto} | {state} | {service} | {product} | {version} |\n")
+                    # On concatène Produit + Version pour la colonne Version
+                    full_version = f"{product} {version}".strip() or "N/A"
+                    
+                    # On écrit la ligne avec l'OS détecté à la fin
+                    f.write(f"| {port_id} | {proto} | {state} | {service} | {full_version} | {detected_os} |\n")
         
         return md_path
     except Exception as e:
@@ -108,7 +119,6 @@ if __name__ == "__main__":
     # Workflow
     xml_file = run_nmap(args.target, args.mode)
     md_file = build_report(xml_file, args.target, args.mode)
-    export_pdf(md_file)
     
     # Nettoyage
     if os.path.exists(xml_file):

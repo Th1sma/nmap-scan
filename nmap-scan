@@ -46,7 +46,7 @@ def run_nmap(target, mode):
     nmap_args = SCAN_PROFILES[mode]['args']
     nmap_cmd = f"nmap {nmap_args} -oX {output_xml} {target}"
     
-    print(f"[*] Profil : {mode.upper()} | Cible : {target}")
+    print(f"[*] Profil : {mode.upper()} | Target : {target}")
     print(f"[*] Action : {SCAN_PROFILES[mode]['desc']}")
     print(f"[*] Launching Nmap, please wait. \n")
 

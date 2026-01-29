@@ -6,19 +6,23 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-# Configuration des profils de scan
+# Configuration profils for Nmap scans
 SCAN_PROFILES = {
     "quick": {
-        "args": "-sV -sC -A -T4",
-        "desc": "Scan standard (1 000 ports) avec détection d'OS, services et scripts par défaut."
+        "args": "-sS -sU -sV -sC -T4",
+        "desc": "Standard quick scan (common ports), versions and default scripts."
     },
     "full": {
-        "args": "-p- -sV -sC -A -T4",
-        "desc": "Scan exhaustif de tous les ports (65535), détection complète et scripts."
+        "args": "-p- -sS -sU -sV -sC -A -T4",
+        "desc": " Full scan (all ports), versions and OS detection."
     },
     "stealth": {
-        "args": "-sS -Pn -f -T2",
-        "desc": "Scan furtif (SYN scan, fragmentation, vitesse lente) sans ping."
+        "args": "-sS -Pn -f --data-length 32 -T2",
+        "desc": " Stealth scan"
+    },
+    "audit": {
+        "args": "-sV --script vuln,exploit,auth,discovery -T4",
+        "desc": " Vulnerabilities scanner : Research of vulnerabilities with NSE scripts."
     }
 }
 
@@ -30,102 +34,98 @@ def print_banner():
  | |\  | | | | | | (_| | |_) |__) | (_| (_| | | | |    
  |_| \_|_| |_| |_|\__,_| .__/____/ \___\__,_|_| |_|    
                        |_|                             
-    --- Outil de scan de port ---
+    --- Port scanner ---
     """
     print(banner)
 
-# Exécution des scans Nmap selon le profil choisi
+# Scan execution with Nmap
 def run_nmap(target, mode):
-    """Exécute nmap et retourne le chemin du fichier XML généré."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     output_xml = f"reports/scan_{target.replace('.', '_')}_{timestamp}.xml"
     
-    nmap_cmd = f"nmap {SCAN_PROFILES[mode]['args']} -oX {output_xml} {target}"
+    nmap_args = SCAN_PROFILES[mode]['args']
+    nmap_cmd = f"nmap {nmap_args} -oX {output_xml} {target}"
     
-    print(f"[*] Mode : {mode.upper()}")
-    print(f"[*] Cible : {target}")
-    print(f"[*] Lancement de Nmap...\n")
-    
+    print(f"[*] Profil : {mode.upper()} | Cible : {target}")
+    print(f"[*] Action : {SCAN_PROFILES[mode]['desc']}")
+    print(f"[*] Launching Nmap, please wait. \n")
+
     try:
-        # Shell=True pour la simplicité de la commande
         subprocess.run(nmap_cmd, shell=True, check=True)
         return output_xml
-    except subprocess.CalledProcessError:
-        print("\n❌ Erreur : Nmap a échoué. Vérifie tes droits (sudo requis pour stealth).")
-        sys.exit(1)
+    except:
+        sys.exit("\n Nmap error. Verified that Nmap is installed and you have the necessary permissions.")
 
-# Construction du rapport Markdown à partir du XML
+# Construction of the Markdown report from the XML output
 def build_report(xml_path, target, mode):
-    """Analyse le XML et génère un rapport incluant TOUS les ports sans distinction d'état."""
     md_path = xml_path.replace(".xml", ".md")
-    
-    try:
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    global_os = "Unknown"
+    os_match = root.find(".//osmatch")
+    if os_match is not None:
+        global_os = os_match.get('name')
+
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(f"# Report : {target}\n\n")
+        f.write(f"- **Date** : {datetime.now().strftime('%d/%m/%Y %H:%M')}\n")
+        f.write(f"- **Profile used** : `{mode.upper()}`\n")
+        f.write(f"- **OS detected** : `{global_os}`\n\n")
         
-        # Extraction de l'OS global (si détecté)
-        detected_os = "Non identifié"
-        os_match = root.find(".//osmatch")
-        if os_match is not None:
-            detected_os = os_match.get('name')
+        # Table of ports and services
+        f.write("## Port and service states\n\n")        
+        f.write("| Port | Protocol | State | Service | Version | OS |\n")
+        f.write("| :--- | :--- | :--- | :--- | :--- | :--- |\n")
+        
+        vulns_found = []
+
+        # Extract ports information
+        for port in root.findall(".//port"):
+            port_id = port.get('portid')
+            protocol = port.get('protocol')
+            state = port.find('state').get('state')
+            
+            service_tag = port.find('service')
+            name = service_tag.get('name', 'N/A') if service_tag is not None else "N/A"
+            prod = service_tag.get('product', '') if service_tag is not None else ""
+            ver = service_tag.get('version', '') if service_tag is not None else ""
+            
+            local_os = global_os
+            if service_tag is not None and service_tag.get('ostype'):
+                local_os = service_tag.get('ostype')
+
+            f.write(f"| {port_id} | {protocol.upper()} | {state} | {name} | {prod} {ver} | {local_os} |\n")
+
+            # Extract vulnerabilities from scripts
+            for script in port.findall('script'):
+                script_id = script.get('id')
+                script_output = script.get('output')
+                vulns_found.append((port_id, script_id, script_output))
+
+        # Vulnerabilities Section
+        if vulns_found:
+            f.write("\n\n## Security analysis (Scripts NSE)\n")
+            for port_id, s_id, s_out in vulns_found:
+                f.write(f"\n### Port {port_id} - Script: `{s_id}`\n")
+                f.write(f"```text\n{s_out.strip()}\n```\n")
         else:
-            service_info = root.find(".//service")
-            if service_info is not None and service_info.get('ostype'):
-                detected_os = service_info.get('ostype')
-
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(f"# Rapport de Scan : {target}\n\n")
-            f.write(f"- **Date** : {datetime.now().strftime('%d/%m/%Y %H:%M')}\n")
-            f.write(f"- **Profil** : {mode.upper()}\n")
-            f.write(f"- **OS détecté** : `{detected_os}`\n\n")
-            
-            f.write("## 📝 Résultats de l'analyse des ports\n\n")
-            f.write("| Port | Protocole | État | Service | Version | Info OS |\n")
-            f.write("| :--- | :--- | :--- | :--- | :--- | :--- |\n")
-            
-            # On boucle sur TOUS les ports listés dans le XML
-            for port in root.findall(".//port"):
-                port_id = port.get('portid')
-                proto = port.get('protocol')
-                
-                # Récupération de l'état (open, closed, etc.)
-                state_node = port.find('state')
-                state = state_node.get('state') if state_node is not None else "unknown"
-                
-                # Récupération des informations de service
-                service_tag = port.find('service')
-                service = "N/A"
-                full_version = "N/A"
-                port_os = detected_os
-                
-                if service_tag is not None:
-                    service = service_tag.get('name', 'N/A')
-                    product = service_tag.get('product', '')
-                    version = service_tag.get('version', '')
-                    full_version = f"{product} {version}".strip() or "N/A"
-                    if service_tag.get('ostype'):
-                        port_os = service_tag.get('ostype')
-
-                # Écriture de la ligne dans le tableau
-                f.write(f"| {port_id} | {proto} | {state} | {service} | {full_version} | {port_os} |\n")
-        
-        return md_path
-    except Exception as e:
-        print(f"❌ Erreur lors de la génération du rapport : {e}")
-        sys.exit(1)
+            f.write("\n\n*No vulnerabilities detected*")
+    
+    return md_path
 
 # Main
 if __name__ == "__main__":
     print_banner()
     
-    parser = argparse.ArgumentParser(description="nmap-scan : Scanner de port.")
-    parser.add_argument("target", help="IP ou domaine à scanner")
+    parser = argparse.ArgumentParser(description="nmap-scan : Port scanner.")
+    parser.add_argument("target", help="IP or domain to scan.")
     parser.add_argument("-m", "--mode", choices=SCAN_PROFILES.keys(), default="quick", 
-                        help="Mode de scan (quick, full, stealth)")
+                        help="Mode de scan (quick, full, stealth, audit). Défaut: quick")
     
     args = parser.parse_args()
     
-    # Création du dossier reports si inexistant
+    # Create reports directory if not exists
     if not os.path.exists("reports"):
         os.makedirs("reports")
 
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     xml_file = run_nmap(args.target, args.mode)
     md_file = build_report(xml_file, args.target, args.mode)
     
-    # Nettoyage
+    # Cleanup XML file
     if os.path.exists(xml_file):
         os.remove(xml_file)
-    print(f"\n[+] Travail terminé. Les rapports sont dans le dossier 'reports/'.")
+    print(f"\n[+] Work done. The reports are in the file 'reports/'.")

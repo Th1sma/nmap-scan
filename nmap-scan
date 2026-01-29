@@ -90,17 +90,6 @@ def build_report(xml_path, target, mode):
         print(f"❌ Erreur lors de la génération du rapport : {e}")
         sys.exit(1)
 
-# Exportation en PDF via Pandoc
-def export_pdf(md_path):
-    """Convertit le Markdown en PDF via Pandoc."""
-    pdf_path = md_path.replace(".md", ".pdf")
-    print(f"[*] Conversion en PDF...")
-    try:
-        subprocess.run(f"pandoc {md_path} -o {pdf_path}", shell=True, check=True)
-        print(f"✅ Rapport PDF généré : {pdf_path}")
-    except Exception:
-        print("⚠️ Alerte : Pandoc n'a pas pu générer le PDF. Le rapport Markdown est conservé.")
-
 # Main
 if __name__ == "__main__":
     print_banner()

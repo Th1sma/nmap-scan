@@ -30,7 +30,7 @@ def print_banner():
  | |\  | | | | | | (_| | |_) |__) | (_| (_| | | | |    
  |_| \_|_| |_| |_|\__,_| .__/____/ \___\__,_|_| |_|    
                        |_|                             
-    --- Microgiciel de scan de port ---
+    --- Outil de scan de port ---
     """
     print(banner)
 

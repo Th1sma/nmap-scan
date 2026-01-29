@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "🚀 Installation de nmap-scan..."
-sudo apt update && sudo apt install -y nmap pandoc texlive-latex-base
+sudo apt update && sudo apt install -y nmap pandoc
 
 mkdir -p reports
 

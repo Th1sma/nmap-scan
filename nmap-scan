@@ -9,7 +9,7 @@ from datetime import datetime
 # Configuration profils for Nmap scans
 SCAN_PROFILES = {
     "quick": {
-        "args": "-sU -sV -sC -T4",
+        "args": "-sS -sV -sC -T4",
         "desc": "Standard quick scan (common ports), versions and default scripts."
     },
     "full": {

@@ -70,7 +70,7 @@ def build_report(xml_path, target, mode):
             f.write(f"- **Détails** : {SCAN_PROFILES[mode]['desc']}\n\n")
             
             f.write("## 📝 Résultats des Ports Ouverts\n\n")
-            f.write("| Port | Protocole | État | Service | Version |\n")
+            f.write("| Port | Protocole | État | Service | Version | OS |\n")
             f.write("| :--- | :--- | :--- | :--- | :--- |\n")
             
             for port in root.findall(".//port"):
@@ -83,7 +83,7 @@ def build_report(xml_path, target, mode):
                     product = service_tag.get('product', '') if service_tag is not None else ""
                     version = service_tag.get('version', '') if service_tag is not None else ""
                     
-                    f.write(f"| {port_id} | {proto} | {state} | {service} | {product} {version} |\n")
+                    f.write(f"| {port_id} | {proto} | {state} | {service} | {product} | {version} |\n")
         
         return md_path
     except Exception as e:
